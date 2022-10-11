@@ -32,10 +32,19 @@ func getPingPong(w http.ResponseWriter, r *http.Request) {
 func  (clnt *GoCache) GetRecord(key []byte) string {
 	data, err := clnt.db.Get(key, nil)
 	//rec := Record{[]string{}, HARD, ""}
+	fmt.Println("DATA ", data)
 	if err != leveldb.ErrNotFound {
 	//	rec = toRecord(data)
 	}
 	return string(data)
+}
+
+func (clnt *GoCache) PutRecord(key []byte, data []byte) {
+	fmt.Println("PurRecord ", key, data)
+	err := clnt.db.Put(key, data, nil)
+	if err != nil{
+		panic("Put didn't work")
+	}
 }
 
 
@@ -52,6 +61,11 @@ func (clnt *GoCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rec := clnt.GetRecord(key)
 		io.WriteString(w, rec)
 
+	}
+
+	if r.Method == "POST" {
+
+		clnt.PutRecord(key, []byte("RAjA"))
 	}
 	
 }
@@ -82,8 +96,7 @@ func main() {
 	}
 	defer  db.Close()  // close db later
 
-	put_err := db.Put([]byte("manish"), []byte("17bcs2423"), nil)
-	fmt.Println("pur error" , put_err)
+
 	//http.HandleFunc("/", HttpHandler)
 	http.HandleFunc("/ping", getPingPong)
 	//http.HandleFunc("/get", GETfunc)
