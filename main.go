@@ -2,6 +2,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -64,8 +65,10 @@ func (clnt *GoCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
-
-		clnt.PutRecord(key, []byte("RAjA"))
+		body, err := ioutil.ReadAll(r.Body)
+		fmt.Println("r.BODY ", body, err)
+		clnt.PutRecord(key, body)
+		io.WriteString(w, "success")
 	}
 	
 }
