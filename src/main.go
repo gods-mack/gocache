@@ -9,11 +9,15 @@ import (
 	"flag"
 	"strings"
 	"log"
+	"sync"
+	//"time"
 )
 
 type GoCache struct {
 	db *leveldb.DB
-	
+	 
+	mutex sync.Mutex
+	key_lock_map map[string]bool
 	// params
 	port int
 	replicas int
@@ -23,9 +27,28 @@ type GoCache struct {
 }
 
 
-func getRoot(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "Server is Running...")
+func (clnt *GoCache) LockKey(key []byte) bool {
+	clnt.mutex.Lock()  // ON mutex
+
+	defer clnt.mutex.Unlock()  // Unlock the mutex at end
+
+	_, is_lock := clnt.key_lock_map[string(key)]
+	fmt.Println("LOCK ", is_lock)
+	if is_lock { // if lock enabled on this given key
+		return false
+	}
+	clnt.key_lock_map = make(map[string]bool)
+	clnt.key_lock_map[string(key)] = true
+	return true
 }
+
+
+func (clnt *GoCache) UnlockKey(key []byte)  {
+	clnt.mutex.Lock()
+	delete(clnt.key_lock_map, string(key))
+	clnt.mutex.Unlock()
+}
+
 
 func getPingPong(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Pong")
@@ -44,6 +67,7 @@ func (clnt *GoCache) PutRecord(key []byte, data []byte) bool {
 	if err != nil{
 		return false 
 	}
+	//time.Sleep(1*time.Second)
 	return true
 }
 
@@ -51,6 +75,19 @@ func (clnt *GoCache) PutRecord(key []byte, data []byte) bool {
 
 func (clnt *GoCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := []byte(r.URL.Path)
+
+
+	if  r.Method == "POST" || r.Method == "DELETE" || r.Method == "PUT" {
+		enabled := clnt.LockKey(key)
+		if !enabled {
+			w.WriteHeader(409)
+			w.Write([]byte("key (thread LOCKED)"))
+			log.Println(r.Method, string(key), 409)
+			return
+		}
+		defer clnt.UnlockKey(key)
+	}
+
 
 
 
