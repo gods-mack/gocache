@@ -8,6 +8,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"flag"
 	"strings"
+	"log"
 )
 
 type GoCache struct {
@@ -32,43 +33,53 @@ func getPingPong(w http.ResponseWriter, r *http.Request) {
 
 func  (clnt *GoCache) GetRecord(key []byte) string {
 	data, err := clnt.db.Get(key, nil)
-	//rec := Record{[]string{}, HARD, ""}
-	fmt.Println("DATA ", data)
 	if err != leveldb.ErrNotFound {
 	//	rec = toRecord(data)
 	}
 	return string(data)
 }
 
-func (clnt *GoCache) PutRecord(key []byte, data []byte) {
-	fmt.Println("PurRecord ", key, data)
+func (clnt *GoCache) PutRecord(key []byte, data []byte) bool {
 	err := clnt.db.Put(key, data, nil)
 	if err != nil{
-		panic("Put didn't work")
+		return false 
 	}
+	return true
 }
 
 
 
 func (clnt *GoCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := []byte(r.URL.Path)
-	log_key := string(key[1:])
-	new_key := []byte(log_key)
 
 
-	fmt.Println("GET_key ", log_key, new_key)
 
 	if r.Method == "GET" {
 		rec := clnt.GetRecord(key)
-		io.WriteString(w, rec)
+		//io.WriteString(w, rec)
+		w.WriteHeader(200)
+		w.Write([]byte(rec))
+		log.Println("GET ",string(key)," [200 OK]")
 
 	}
 
 	if r.Method == "POST" {
 		body, err := ioutil.ReadAll(r.Body)
-		fmt.Println("r.BODY ", body, err)
-		clnt.PutRecord(key, body)
-		io.WriteString(w, "success")
+		if err != nil{
+			panic("IO readAll didn't work.")
+		
+		}
+		code := 201
+		msg := "success"
+		if clnt.PutRecord(key, body) != true{
+			code = 400
+			msg = "failed"
+		}
+		//io.WriteString(w, "success")
+		w.WriteHeader(code)
+        w.Write([]byte(msg))
+        log.Println("PUT ",string(key), code)
+
 	}
 	
 }
@@ -77,8 +88,7 @@ func (clnt *GoCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
-	fmt.Println("GoCache is Running...")
-	fmt.Println("============================")
+	fmt.Println("====== GoCache is Running... =======")
 	
 	port := flag.Int("port", 3699, "Port to serve")
 	db_path := flag.String("db_path", "", "Path to key-value db may levelDb")
@@ -88,8 +98,6 @@ func main() {
 	volumes := strings.Split(*pvolumes, ",")
 	flag.Parse()
 
-	_a, _b, _c , _d, _e := port, db_path, replicas, volumes, md5sum
-	fmt.Println("cmdline params ", *_a, *_b,*_c, _d, *_e)
 	fmt.Printf("Server running at 0:%d\n",*port)
 	
 
@@ -100,9 +108,7 @@ func main() {
 	defer  db.Close()  // close db later
 
 
-	//http.HandleFunc("/", HttpHandler)
 	http.HandleFunc("/ping", getPingPong)
-	//http.HandleFunc("/get", GETfunc)
 
 
 	client := GoCache{
