@@ -2,15 +2,16 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	//"io/ioutil"
 	"net/http"
 	"strconv"
 	"github.com/syndtr/goleveldb/leveldb"
 	"flag"
 	"strings"
-	"log"
+	//"log"
 	"sync"
-	//"time"
+	//"time
+
 )
 
 type GoCache struct {
@@ -27,98 +28,8 @@ type GoCache struct {
 }
 
 
-func (clnt *GoCache) LockKey(key []byte) bool {
-	clnt.mutex.Lock()  // ON mutex
-
-	defer clnt.mutex.Unlock()  // Unlock the mutex at end
-
-	_, is_lock := clnt.key_lock_map[string(key)]
-	fmt.Println("LOCK ", is_lock)
-	if is_lock { // if lock enabled on this given key
-		return false
-	}
-	clnt.key_lock_map = make(map[string]bool)
-	clnt.key_lock_map[string(key)] = true
-	return true
-}
-
-
-func (clnt *GoCache) UnlockKey(key []byte)  {
-	clnt.mutex.Lock()
-	delete(clnt.key_lock_map, string(key))
-	clnt.mutex.Unlock()
-}
-
-
 func getPingPong(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Pong")
-}
-
-func  (clnt *GoCache) GetRecord(key []byte) string {
-	data, err := clnt.db.Get(key, nil)
-	if err != leveldb.ErrNotFound {
-	//	rec = toRecord(data)
-	}
-	return string(data)
-}
-
-func (clnt *GoCache) PutRecord(key []byte, data []byte) bool {
-	err := clnt.db.Put(key, data, nil)
-	if err != nil{
-		return false 
-	}
-	//time.Sleep(1*time.Second)
-	return true
-}
-
-
-
-func (clnt *GoCache) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	key := []byte(r.URL.Path)
-
-
-	if  r.Method == "POST" || r.Method == "DELETE" || r.Method == "PUT" {
-		enabled := clnt.LockKey(key)
-		if !enabled {
-			w.WriteHeader(409)
-			w.Write([]byte("key (thread LOCKED)"))
-			log.Println(r.Method, string(key), 409)
-			return
-		}
-		defer clnt.UnlockKey(key)
-	}
-
-
-
-
-	if r.Method == "GET" {
-		rec := clnt.GetRecord(key)
-		//io.WriteString(w, rec)
-		w.WriteHeader(200)
-		w.Write([]byte(rec))
-		log.Println("GET ",string(key)," [200 OK]")
-
-	}
-
-	if r.Method == "POST" {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil{
-			panic("IO readAll didn't work.")
-		
-		}
-		code := 201
-		msg := "success"
-		if clnt.PutRecord(key, body) != true{
-			code = 400
-			msg = "failed"
-		}
-		//io.WriteString(w, "success")
-		w.WriteHeader(code)
-        w.Write([]byte(msg))
-        log.Println("PUT ",string(key), code)
-
-	}
-	
 }
 
 
@@ -145,7 +56,7 @@ func main() {
 	defer  db.Close()  // close db later
 
 
-	http.HandleFunc("/ping", getPingPong)
+	//http.HandleFunc("/ping", getPingPong)
 
 
 	client := GoCache{
